@@ -14,9 +14,24 @@ import paho.mqtt.client as mqtt
 import math
 from datetime import datetime
 import configparser
+import subprocess
+import platform
 
 status_m = 10
 status = {0: 'Online', 2: "DataError", 3: 'Offline', 4:"TimeoutError", 10:"undefined"}
+
+#source: https://dmitrygolovach.com/python-ping-ip-address/
+def ping_ip(current_ip_address):
+        try:
+            output = subprocess.check_output("ping -{} 1 {}".format('n' if platform.system().lower(
+            ) == "windows" else 'c', current_ip_address ), shell=True, universal_newlines=True)
+            if 'unreachable' in output:
+                return False
+            else:
+                return True
+        except Exception:
+                return False
+
 
 def getValueOfID(wait ,htmlID):
   ret = float("NaN")
@@ -103,23 +118,27 @@ if __name__=='__main__':
   config = configparser.ConfigParser()
   path = os.path.dirname(__file__)
   config.read(path+'/config.ini')
+  bosswerkIP = '192.168.x.x       #IP address from Bosswerk MI600 in network
   url1 = config['BOSSWERK']['url']
   sn1 = config['BOSSWERK']['sn']
   mqtt_ip = config['MQTT']['ip']
   mqtt_port = int(config['MQTT']['port'])
 
-  print(datetime.today().strftime('%Y-%m-%d %H:%M:%S'))
-  getDataCount = 0
-  while getDataCount<10:
-    print("Try-Number: "+str(getDataCount))
-    power, today, total, status_r = getDataFromBosswerk(url1,sn1)
-    print("Power: "+str(power)+" W")
-    print("Today: "+str(today)+" kWh")
-    print("Total: "+str(total)+" kWh")
-    if status_r <= 1:
-      break
-    else:
-      getDataCount = getDataCount + 1
-  client = connectMQTT(mqtt_ip, mqtt_port)
-  sendData(client, power, today, total, status_r)
-  print("Status: "+status[status_r])
+  if ping_ip(bosswerkIP) == True:
+    print(datetime.today().strftime('%Y-%m-%d %H:%M:%S'))
+    getDataCount = 0
+    while getDataCount<10:
+      print("Try-Number: "+str(getDataCount))
+      power, today, total, status_r = getDataFromBosswerk(url1,sn1)
+      print("Power: "+str(power)+" W")
+      print("Today: "+str(today)+" kWh")
+      print("Total: "+str(total)+" kWh")
+      if status_r <= 1:
+        break
+      else:
+        getDataCount = getDataCount + 1
+    client = connectMQTT(mqtt_ip, mqtt_port)
+    sendData(client, power, today, total, status_r)
+    print("Status: "+status[status_r])
+  else:
+    print("Status: Offline")
